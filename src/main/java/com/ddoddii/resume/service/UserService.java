@@ -14,7 +14,6 @@ import com.ddoddii.resume.error.exception.NotExistIdException;
 import com.ddoddii.resume.model.RefreshToken;
 import com.ddoddii.resume.model.User;
 import com.ddoddii.resume.model.eunm.LoginType;
-import com.ddoddii.resume.model.eunm.RoleType;
 import com.ddoddii.resume.repository.RefreshTokenRepository;
 import com.ddoddii.resume.repository.UserRepository;
 import com.ddoddii.resume.security.CustomUserDetails;
@@ -69,7 +68,7 @@ public class UserService {
         String encryptedPassword = encryptPassword(userEmailSignUpRequestDTO.getPassword());
 
         // 사용자 정보 저장
-        User user = getUser(userEmailSignUpRequestDTO, encryptedPassword);
+        User user = User.signUpUser(userEmailSignUpRequestDTO.getName(), userEmailSignUpRequestDTO.getEmail(), encryptedPassword);
 
         // 명시적으로 save 유저 변수 추출
         User saveUser = userRepository.save(user);
@@ -93,17 +92,8 @@ public class UserService {
         if (!PasswordEncrypter.isMatch(userLoginRequestDTO.getPassword(), user.getPassword())) {
             throw new BadCredentialsException(UserErrorCode.BAD_CREDENTIALS);
         }
-        // GrantedAuthority 를 반환하는 메서드를 가진 CustomUserDetails 만들기
-        CustomUserDetails customUserDetails = new CustomUserDetails(user);
-
-        // Authorities 를 가지는 Authentication 객체
-        UsernamePasswordAuthenticationToken authenticationToken = new UsernamePasswordAuthenticationToken(
-                user.getEmail(),
-                user.getPassword(),
-                customUserDetails.getAuthorities()
-        );
-
-        JwtTokenDTO loginToken = tokenProvider.createToken(authenticationToken);
+        // JWT 토큰 만들기
+        JwtTokenDTO loginToken = getJwtTokenDTO(user);
 
         //refresh token 저장
         refreshTokenService.saveRefreshToken(user.getEmail(), loginToken.getRefreshToken());
@@ -125,15 +115,25 @@ public class UserService {
 
     // 구글 회원가입
     public UserDTO googleSignUp(UserGoogleLoginRequestDTO userGoogleLoginRequestDTO) {
-        User encryptedUser = encryptGoogleLoginUser(userGoogleLoginRequestDTO);
-        encryptedUser.setLoginType(LoginType.GOOGLE);
-        userRepository.save(encryptedUser);
-        logger.info("{} 가 저장되었습니다. ", encryptedUser.getEmail());
+        // 이미 존재하는 이메일인지 확인
+        if (userRepository.existsByEmail(userGoogleLoginRequestDTO.getEmail())) {
+            throw new DuplicateIdException(UserErrorCode.DUPLICATE_USER);
+        }
+
+        // 비밀번호 암호화
+        String encryptPassword = encryptPassword(userGoogleLoginRequestDTO.getIdToken());
+        User user = User.signUpUser(userGoogleLoginRequestDTO.getName(), userGoogleLoginRequestDTO.getEmail(), encryptPassword);
+        user.setLoginType(LoginType.GOOGLE);
+
+        User saveUser = userRepository.save(user);
+        logger.info("{} 가 저장되었습니다. ", user.getEmail());
 
         return UserDTO.builder().
-                userId(encryptedUser.getId())
-                .name(userGoogleLoginRequestDTO.getName())
-                .email(userGoogleLoginRequestDTO.getEmail())
+                userId(saveUser.getId())
+                .name(saveUser.getName())
+                .email(saveUser.getEmail())
+                // TODO: Enum 값이 잘못 설정되어 있음.
+                // LoginType.GOOGLE 로 설정해야 함.
                 .loginType(LoginType.EMAIL)
                 .remainInterview(REMAIN_INTERVIEW)
                 .build();
@@ -156,19 +156,14 @@ public class UserService {
             // 유저가 존재하지 않으면 회원가입 진행
             log.debug("@구글 로그인 : 회원가입 진행합니다");
             UserDTO newUser = googleSignUp(userGoogleLoginRequestDTO);
+
+            // TODO: 무엇을 검증하기 위한 코드인지 설명이 필요.
+            // googleSignUp 메소드이 성공적으로 동작했다면 디비에 유저 정보가 저장되는 것이 보장되어 있음.
             user = userRepository.findById(newUser.getUserId())
                     .orElseThrow(() -> new RuntimeException("Error during user sign-up"));
         }
-
-        CustomUserDetails customUserDetails = new CustomUserDetails(user);
-
-        UsernamePasswordAuthenticationToken authenticationToken = new UsernamePasswordAuthenticationToken(
-                userGoogleLoginRequestDTO.getEmail(),
-                userGoogleLoginRequestDTO.getIdToken(),
-                customUserDetails.getAuthorities()
-        );
-
-        JwtTokenDTO loginToken = tokenProvider.createToken(authenticationToken);
+        // JWT 토큰 만들기
+        JwtTokenDTO loginToken = getJwtTokenDTO(user);
 
         //refresh token 저장
         refreshTokenService.saveRefreshToken(user.getEmail(), loginToken.getRefreshToken());
@@ -215,13 +210,10 @@ public class UserService {
         RefreshToken refreshToken = refreshTokenService.findByRefreshToken(token)
                 .orElseThrow(() -> new RuntimeException("Refresh Token not found"));
         User user = refreshToken.getUser();
-        CustomUserDetails customUserDetails = new CustomUserDetails(user);
-        UsernamePasswordAuthenticationToken newAuthenticationToken = new UsernamePasswordAuthenticationToken(
-                user.getEmail(),
-                user.getPassword(),
-                customUserDetails.getAuthorities()
-        );
-        JwtTokenDTO newToken = tokenProvider.createToken(newAuthenticationToken);
+
+        // JWT 토큰 만들기
+        JwtTokenDTO newToken = getJwtTokenDTO(user);
+
         refreshTokenService.saveRefreshToken(user.getEmail(), newToken.getRefreshToken());
         return newToken;
     }
@@ -245,34 +237,25 @@ public class UserService {
                 .build();
     }
 
-
-
-    // 사용자 유저 정보 반환
-    private User getUser(UserEmailSignUpRequestDTO userEmailSignUpRequestDTO, String encryptedPassword) {
-        User user = new User();
-        user.setPassword(encryptedPassword);
-        user.setName(userEmailSignUpRequestDTO.getName());
-        user.setEmail(userEmailSignUpRequestDTO.getEmail());
-        user.setRole(RoleType.ROLE_USER);
-        user.setRemainInterview(REMAIN_INTERVIEW);
-        user.setLoginType(LoginType.EMAIL);
-        return user;
-    }
-
     // 비밀번호 암호화
     private String encryptPassword(String password) {
         return PasswordEncrypter.encrypt(password);
     }
 
-    private User encryptGoogleLoginUser(UserGoogleLoginRequestDTO googleLoginRequestDTO) {
-        String encryptedIdToken = PasswordEncrypter.encrypt(googleLoginRequestDTO.getIdToken());
-        User user = new User();
-        user.setPassword(encryptedIdToken);
-        user.setName(googleLoginRequestDTO.getName());
-        user.setEmail(googleLoginRequestDTO.getEmail());
-        user.setRole(RoleType.ROLE_USER);
-        user.setRemainInterview(REMAIN_INTERVIEW);
-        return user;
-    }
+    /**
+     * 사용자 정보를 이용하여 토큰 발행하는 메소드
+     * @param user 사용자 정보
+     * @return JwtTokenDTO
+     */
+    private JwtTokenDTO getJwtTokenDTO(User user) {
+        CustomUserDetails customUserDetails = new CustomUserDetails(user);
 
+        UsernamePasswordAuthenticationToken authenticationToken = new UsernamePasswordAuthenticationToken(
+                user.getEmail(),
+                user.getPassword(),
+                customUserDetails.getAuthorities()
+        );
+
+        return tokenProvider.createToken(authenticationToken);
+    }
 }
