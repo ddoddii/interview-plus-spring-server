@@ -88,6 +88,7 @@ class UserServiceTest {
                 .refreshToken(refreshToken).build());
 
 
+
         // when
         UserAuthResponseDTO userAuthResponseDTO = userService.emailSignUpAndLogin(userEmailSignUpRequestDTO);
 
@@ -113,7 +114,8 @@ class UserServiceTest {
         given(userRepository.existsByEmail(anyString())).willReturn(true);
 
         // then
-        assertThrows(DuplicateIdException.class, () -> userService.emailSignUpAndLogin(userEmailSignUpRequestDTO));
+        assertThrows(DuplicateIdException.class, () -> userService.signUp(userEmailSignUpRequestDTO, LoginType.EMAIL));
+
     }
 
     @DisplayName("이메일 로그인 - 성공")
@@ -345,7 +347,7 @@ class UserServiceTest {
         NotExistIdException exception = assertThrows(NotExistIdException.class, () -> userService.generateNewAccessToken(refreshTokenParm));
 
         // then
-        assertEquals("Refresh Token not found", exception.getErrorCode().getMessage());
+        assertEquals("User not found", ((NotExistIdException) exception).getErrorCode().getMessage());
 
     }
 }

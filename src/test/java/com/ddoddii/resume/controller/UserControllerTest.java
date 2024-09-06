@@ -42,6 +42,9 @@ class UserControllerTest {
     @MockBean
     private JwtFilter jwtFilter;
 
+    @MockBean
+    private EmailService emailService;
+
     @Autowired
     private ObjectMapper objectMapper;
 
@@ -170,7 +173,7 @@ class UserControllerTest {
 
         JwtTokenDTO jwtTokenDTO =JwtTokenDTO.builder().refreshToken("refreshToken").accessToken("accessToken").grantType("Bearer").build();
         UserAuthResponseDTO userAuthResponseDTO =UserAuthResponseDTO.builder().user(userDTO).token(jwtTokenDTO).build();
-        when(userService.emailLogin(any(), any())).thenReturn(userAuthResponseDTO);
+        when(userService.emailLogin(any(UserEmailLoginRequestDTO.class), any(LoginType.class))).thenReturn(userAuthResponseDTO);
 
         this.mockMvc.perform(post("/api/users/email-login")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -188,7 +191,7 @@ class UserControllerTest {
     @Test
     void emailLoginFail_NotExistEmail() throws Exception {
         // given
-        when(userService.emailLogin(any(), any())).thenThrow(new DuplicateIdException(UserErrorCode.BAD_CREDENTIALS));
+        when(userService.emailLogin(any(UserEmailLoginRequestDTO.class), any(LoginType.class))).thenThrow(new DuplicateIdException(UserErrorCode.BAD_CREDENTIALS));
 
         UserEmailLoginRequestDTO request = UserEmailLoginRequestDTO.builder()
                 .email(email)
@@ -206,7 +209,8 @@ class UserControllerTest {
     @Test
     void emailLoginFail_WrongPassword() throws Exception {
         // given
-        when(userService.emailLogin(any(),any())).thenThrow(new DuplicateIdException(UserErrorCode.BAD_CREDENTIALS));
+        when(userService.emailLogin(any(UserEmailLoginRequestDTO.class), any(LoginType.class))).thenThrow(new DuplicateIdException(UserErrorCode.BAD_CREDENTIALS));
+
 
         UserEmailLoginRequestDTO request = UserEmailLoginRequestDTO.builder()
                 .email(email)
