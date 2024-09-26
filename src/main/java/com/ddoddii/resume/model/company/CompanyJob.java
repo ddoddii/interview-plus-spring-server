@@ -26,6 +26,12 @@ public class CompanyJob {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Column(name = "department")
+    private String department;
+
+    @Column(name = "dept_id")
+    private int deptId;
+
     @NotBlank
     @Column(name = "job")
     private String job;

@@ -1,6 +1,7 @@
 package com.ddoddii.resume.service;
 
 import com.ddoddii.resume.dto.company.CompanyDeptDTO;
+import com.ddoddii.resume.dto.company.CompanyJobAndDeptDTO;
 import com.ddoddii.resume.dto.company.CompanyJobDTO;
 import com.ddoddii.resume.dto.company.CompanyNameDTO;
 import com.ddoddii.resume.model.company.CompanyDept;
@@ -10,6 +11,7 @@ import com.ddoddii.resume.repository.CompanyDeptRepository;
 import com.ddoddii.resume.repository.CompanyJobRepository;
 import com.ddoddii.resume.repository.CompanyNameRepository;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -40,10 +42,37 @@ public class CompanyService {
                 .collect(Collectors.toList());
     }
 
-    public List<CompanyJobDTO> getCompanyJobs() {
-        List<CompanyJob> companyJobs = companyJobRepository.findAll();
+    public List<CompanyJobDTO> getCompanyJobs(long departmentId) {
+        CompanyDept dept = companyDeptRepository.findById(departmentId);
+        List<CompanyJob> companyJobs = companyJobRepository.findByDepartment(dept.getDept());
         return companyJobs.stream()
                 .map(companyJob -> new CompanyJobDTO(companyJob.getId(), companyJob.getJob()))
                 .collect(Collectors.toList());
+    }
+
+    public List<CompanyJobAndDeptDTO> getCompanyDeptAndJobs() {
+        List<CompanyJob> companyJobs = companyJobRepository.findAll();
+
+        Map<Integer, Map.Entry<String, List<CompanyJobDTO>>> deptIdToJobsMap = companyJobs.stream()
+                .collect(Collectors.groupingBy(
+                        CompanyJob::getDeptId,
+                        Collectors.collectingAndThen(
+                                Collectors.toList(),
+                                jobs -> {
+                                    String departmentName = jobs.get(0).getDepartment();
+                                    List<CompanyJobDTO> jobDTOs = jobs.stream()
+                                            .map(companyJob -> new CompanyJobDTO(companyJob.getId(),
+                                                    companyJob.getJob()))
+                                            .collect(Collectors.toList());
+                                    return Map.entry(departmentName, jobDTOs);
+                                }
+                        )
+                ));
+
+        return deptIdToJobsMap.entrySet().stream()
+                .map(entry -> new CompanyJobAndDeptDTO(entry.getKey(), entry.getValue().getKey(),
+                        entry.getValue().getValue()))
+                .collect(Collectors.toList());
+
     }
 }
