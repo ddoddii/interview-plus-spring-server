@@ -1,7 +1,21 @@
+buildscript {
+    repositories {
+        mavenCentral()
+        google()
+    }
+}
+
 plugins {
     id 'java'
     id 'org.springframework.boot' version '3.2.3'
     id 'io.spring.dependency-management' version '1.1.4'
+}
+
+allprojects {
+    repositories {
+        google()
+        mavenCentral()
+    }
 }
 
 group = 'com.ddoddii'
@@ -58,7 +72,7 @@ dependencies {
     testImplementation "org.testcontainers:junit-jupiter:1.20.1"
     testImplementation "org.testcontainers:mysql:1.20.1"
     testImplementation 'org.apache.httpcomponents:httpclient:4.5.13'
-    
+
     // swagger
     implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.6.0'
 
@@ -69,7 +83,10 @@ dependencies {
     implementation 'com.sun.mail:javax.mail:1.6.2'
     //firebase
     implementation 'com.google.firebase:firebase-admin:8.1.0'
+    //google cloud storage
+    implementation 'com.google.cloud:google-cloud-storage:2.39.0'
 }
+
 
 tasks.named('test') {
     useJUnitPlatform()
@@ -113,3 +130,4 @@ task dockerTests(type: Test) {
         includeTags 'docker-required'
     }
 }
+
