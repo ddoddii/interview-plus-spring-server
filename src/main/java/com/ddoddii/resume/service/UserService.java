@@ -6,35 +6,43 @@ import com.ddoddii.resume.dto.user.UserAuthResponseDTO;
 import com.ddoddii.resume.dto.user.UserDTO;
 import com.ddoddii.resume.dto.user.UserEmailLoginRequestDTO;
 import com.ddoddii.resume.dto.user.UserEmailSignUpRequestDTO;
+import com.ddoddii.resume.dto.user.UserGoogleInfoDTO;
 import com.ddoddii.resume.dto.user.UserGoogleLoginRequestDTO;
 import com.ddoddii.resume.error.errorcode.UserErrorCode;
 import com.ddoddii.resume.error.exception.BadCredentialsException;
+import com.ddoddii.resume.error.exception.DuplicateEmailException;
 import com.ddoddii.resume.error.exception.DuplicateIdException;
+import com.ddoddii.resume.error.exception.GoogleAccountRetrieveException;
+import com.ddoddii.resume.error.exception.JsonParseException;
 import com.ddoddii.resume.error.exception.NotExistIdException;
-import com.ddoddii.resume.model.RefreshToken;
 import com.ddoddii.resume.model.Resume;
 import com.ddoddii.resume.model.User;
 import com.ddoddii.resume.model.eunm.LoginType;
 import com.ddoddii.resume.model.eunm.RoleType;
-import com.ddoddii.resume.repository.RefreshTokenRepository;
 import com.ddoddii.resume.repository.ResumeRepository;
 import com.ddoddii.resume.repository.UserRepository;
 import com.ddoddii.resume.security.CustomUserDetails;
 import com.ddoddii.resume.security.TokenProvider;
 import com.ddoddii.resume.util.PasswordEncrypter;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.transaction.Transactional;
 import java.util.List;
-import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
 
 /*
 사용자의 회원가입, 로그인을 담당하는 서비스 레이어
@@ -47,12 +55,11 @@ public class UserService {
 
     private final UserRepository userRepository;
     private final ResumeRepository resumeRepository;
-    private final RefreshTokenRepository refreshTokenRepository;
     private final TokenProvider tokenProvider;
-    private final RefreshTokenService refreshTokenService;
     private static final Integer REMAIN_INTERVIEW = 5;
+    private static final String GOOGLE_USERINFO_URL = "https://www.googleapis.com/oauth2/v3/userinfo";
 
-    private Logger logger = LoggerFactory.getLogger(this.getClass());
+    private final Logger logger = LoggerFactory.getLogger(this.getClass());
 
     // 사용자 회원가입시 사용자 정보와 로그인 토큰도 함께 반환
     public UserAuthResponseDTO emailSignUpAndLogin(UserEmailSignUpRequestDTO userEmailSignUpRequestDTO) {
@@ -101,9 +108,6 @@ public class UserService {
         // JWT 토큰 만들기
         JwtTokenDTO loginToken = getJwtTokenDTO(user);
 
-        //refresh token 저장
-        refreshTokenService.saveRefreshToken(user.getEmail(), loginToken.getRefreshToken());
-
         //UserDTO
         UserDTO loggedInUser = UserDTO.builder().
                 userId(user.getId())
@@ -120,71 +124,87 @@ public class UserService {
     }
 
     // 구글 회원가입
-    public UserDTO googleSignUp(UserGoogleLoginRequestDTO userGoogleLoginRequestDTO) {
+    public User googleSignUp(UserGoogleInfoDTO userGoogleInfoDTO) {
         // 이미 존재하는 이메일인지 확인
-        if (userRepository.existsByEmail(userGoogleLoginRequestDTO.getEmail())) {
+        if (userRepository.existsByEmail(userGoogleInfoDTO.getEmail())) {
             throw new DuplicateIdException(UserErrorCode.DUPLICATE_USER);
         }
 
         // 비밀번호 암호화
-        String encryptPassword = encryptPassword(userGoogleLoginRequestDTO.getIdToken());
-        User user = User.signUpUser(userGoogleLoginRequestDTO.getName(), userGoogleLoginRequestDTO.getEmail(),
+        String encryptPassword = encryptPassword(userGoogleInfoDTO.getAccessToken());
+        User user = User.signUpUser(userGoogleInfoDTO.getName(), userGoogleInfoDTO.getEmail(),
                 encryptPassword);
         user.setLoginType(LoginType.GOOGLE);
 
         User saveUser = userRepository.save(user);
         logger.info("{} 가 저장되었습니다. ", user.getEmail());
 
-        return UserDTO.builder().
-                userId(saveUser.getId())
-                .name(saveUser.getName())
-                .email(saveUser.getEmail())
-                .loginType(saveUser.getLoginType())
-                .remainInterview(REMAIN_INTERVIEW)
-                .build();
+        return saveUser;
     }
 
     // 구글 로그인
     public UserAuthResponseDTO googleLogin(UserGoogleLoginRequestDTO userGoogleLoginRequestDTO) {
-        Optional<User> optionalUser = userRepository.findByEmail(userGoogleLoginRequestDTO.getEmail());
-
-        User user;
-        //유저 존재하는지 확인
-        if (optionalUser.isPresent()) {
-            user = optionalUser.get();
-            log.debug("@구글 로그인 : {} 유저는 존재합니다", user.getName());
-            if (!PasswordEncrypter.isMatch(userGoogleLoginRequestDTO.getIdToken(), user.getPassword())) {
-                log.debug("@구글 로그인 : {} 유저 비밀번호 오류입니다", user.getName());
+        UserGoogleInfoDTO userGoogleInfoDTO = getGoogleInfo(userGoogleLoginRequestDTO);
+        User currentUser;
+        if (!userRepository.existsByEmail(userGoogleInfoDTO.getEmail())) {
+            currentUser = googleSignUp(userGoogleInfoDTO);
+        } else {
+            currentUser = userRepository.findByEmail(userGoogleInfoDTO.getEmail())
+                    .orElseThrow(() -> new BadCredentialsException(UserErrorCode.BAD_CREDENTIALS));
+            if (!PasswordEncrypter.isMatch(userGoogleInfoDTO.getAccessToken(), currentUser.getPassword())) {
                 throw new BadCredentialsException(UserErrorCode.BAD_CREDENTIALS);
             }
-        } else {
-            // 유저가 존재하지 않으면 회원가입 진행
-            log.debug("@구글 로그인 : 회원가입 진행합니다");
-            UserDTO newUser = googleSignUp(userGoogleLoginRequestDTO);
-
-            user = userRepository.findById(newUser.getUserId())
-                    .orElseThrow(() -> new RuntimeException("Error during user sign-up"));
         }
-        // JWT 토큰 만들기
-        JwtTokenDTO loginToken = getJwtTokenDTO(user);
 
-        //refresh token 저장
-        refreshTokenService.saveRefreshToken(user.getEmail(), loginToken.getRefreshToken());
+        JwtTokenDTO loginToken = getJwtTokenDTO(currentUser);
 
         //UserDTO
         UserDTO loggedInUser = UserDTO.builder().
-                userId(user.getId())
-                .name(user.getName())
-                .email(user.getEmail())
-                .loginType(user.getLoginType())
-                .remainInterview(user.getRemainInterview())
+                userId(currentUser.getId())
+                .name(currentUser.getName())
+                .email(currentUser.getEmail())
+                .loginType(currentUser.getLoginType())
+                .remainInterview(currentUser.getRemainInterview())
                 .build();
-        log.debug("@구글 로그인 : {} 로그인 성공", loggedInUser.getEmail());
 
         return UserAuthResponseDTO.builder()
                 .user(loggedInUser)
                 .token(loginToken)
                 .build();
+
+    }
+
+
+    private UserGoogleInfoDTO getGoogleInfo(UserGoogleLoginRequestDTO userGoogleLoginRequestDTO) {
+        RestTemplate restTemplate = new RestTemplate();
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("Authorization",
+                userGoogleLoginRequestDTO.getTokenType() + " " + userGoogleLoginRequestDTO.getAccessToken());
+
+        HttpEntity<String> entity = new HttpEntity<>(headers);
+
+        ResponseEntity<String> response = restTemplate.exchange(
+                GOOGLE_USERINFO_URL,
+                HttpMethod.GET,
+                entity,
+                String.class
+        );
+
+        if (response.getStatusCode() == HttpStatus.OK) {
+            String userInfo = response.getBody();
+            ObjectMapper mapper = new ObjectMapper();
+            try {
+                UserGoogleInfoDTO googleUserInfo = mapper.readValue(userInfo, UserGoogleInfoDTO.class);
+                googleUserInfo.setAccessToken(userGoogleLoginRequestDTO.getAccessToken());
+                log.info("GOOGLE LOGIN : Getting {} google account info...", googleUserInfo.getName());
+                return googleUserInfo;
+            } catch (Exception e) {
+                throw new JsonParseException(UserErrorCode.GOOGLE_ACCOUNT_PARSE_ERROR);
+            }
+        } else {
+            throw new GoogleAccountRetrieveException(UserErrorCode.GOOGLE_ACCOUNT_RETRIEVE_ERROR);
+        }
     }
 
     public boolean checkDuplicateEmail(DuplicateEmailRequestDTO requestDTO) {
@@ -192,13 +212,12 @@ public class UserService {
     }
 
     public UserAuthResponseDTO guestSignUpAndLogin() {
-        int length = 15;
-        boolean useLetters = true;
-        boolean useNumbers = false;
-        String generatedRandomId = RandomStringUtils.random(length, useLetters, useNumbers);
-        String randomPassword = RandomStringUtils.random(length, useLetters, useNumbers);
+        int length = 10;
+        String randomId = RandomStringUtils.randomAlphanumeric(length);
+        String guestEmail = "guest_" + randomId + "@example.com";
+        String randomPassword = RandomStringUtils.randomAlphanumeric(length);
         UserEmailSignUpRequestDTO guestSignUpRequestDTO = UserEmailSignUpRequestDTO.builder()
-                .email(generatedRandomId)
+                .email(guestEmail)
                 .name("guest")
                 .password(randomPassword)
                 .build();
@@ -210,23 +229,64 @@ public class UserService {
         return emailLogin(guestLoginRequestDTO, LoginType.GUEST);
     }
 
-    // 게스트 회원가입 & 로그인
-    public void guestEmailSignUpAndLogin(UserEmailSignUpRequestDTO userEmailSignUpRequestDTO) {
+    // 게스트 일반 유저로 회원가입
+    public UserAuthResponseDTO upgradeGuestToRegular(UserEmailSignUpRequestDTO userEmailSignUpRequestDTO) {
         User guestUser = getCurrentUser();
+
+        if (userRepository.existsByEmail(userEmailSignUpRequestDTO.getEmail())) {
+            throw new DuplicateEmailException(UserErrorCode.DUPLICATE_USER);
+        }
+
+        String hashedPassword = encryptPassword(userEmailSignUpRequestDTO.getPassword());
+
         guestUser.setName(userEmailSignUpRequestDTO.getName());
         guestUser.setEmail(userEmailSignUpRequestDTO.getEmail());
-        guestUser.setPassword(userEmailSignUpRequestDTO.getPassword());
+        guestUser.setPassword(hashedPassword);
+        guestUser.setLoginType(LoginType.EMAIL);
+
         userRepository.save(guestUser);
+
+        JwtTokenDTO loginToken = getJwtTokenDTO(guestUser);
+
+        UserDTO loggedInUser = UserDTO.builder()
+                .userId(guestUser.getId())
+                .name(guestUser.getName())
+                .email(guestUser.getEmail())
+                .loginType(guestUser.getLoginType())
+                .remainInterview(guestUser.getRemainInterview())
+                .build();
+
+        return UserAuthResponseDTO.builder()
+                .user(loggedInUser)
+                .token(loginToken)
+                .build();
     }
 
-    public void guestGoogleSignUpAndLogin(UserGoogleLoginRequestDTO userGoogleLoginRequestDTO) {
-        User guestUser = getCurrentUser();
-        guestUser.setName(userGoogleLoginRequestDTO.getName());
-        guestUser.setEmail(userGoogleLoginRequestDTO.getEmail());
-        String encryptedIdToken = PasswordEncrypter.encrypt(userGoogleLoginRequestDTO.getIdToken());
-        guestUser.setPassword(encryptedIdToken);
-        userRepository.save(guestUser);
-    }
+//    public UserAuthResponseDTO guestGoogleSignUpAndLogin(UserGoogleLoginRequestDTO userGoogleLoginRequestDTO) {
+//        User guestUser = getCurrentUser();
+//        guestUser.setName(userGoogleLoginRequestDTO.getName());
+//        guestUser.setEmail(userGoogleLoginRequestDTO.getEmail());
+//        String encryptedIdToken = PasswordEncrypter.encrypt(userGoogleLoginRequestDTO.getAccessToken());
+//        guestUser.setPassword(encryptedIdToken);
+//        guestUser.setLoginType(LoginType.GOOGLE);
+//        userRepository.save(guestUser);
+//
+//        JwtTokenDTO loginToken = getJwtTokenDTO(guestUser);
+//
+//        UserDTO loggedInUser = UserDTO.builder()
+//                .userId(guestUser.getId())
+//                .name(guestUser.getName())
+//                .email(guestUser.getEmail())
+//                .loginType(guestUser.getLoginType())
+//                .remainInterview(guestUser.getRemainInterview())
+//                .build();
+//
+//        return UserAuthResponseDTO.builder()
+//                .user(loggedInUser)
+//                .token(loginToken)
+//                .build();
+//
+//    }
 
 
     // 사용자 삭제
@@ -245,19 +305,6 @@ public class UserService {
         userRepository.save(user);
     }
 
-    // refreshToken 기반 accessToken 재발급
-    public JwtTokenDTO generateNewAccessToken(String token) {
-        RefreshToken refreshToken = refreshTokenService.findByRefreshToken(token)
-                // TODO: 예외처리 명확히 명시하기 (NotFoundRefreshTokenException)
-                .orElseThrow(() -> new NotExistIdException(UserErrorCode.NOT_EXIST_USER));
-        User user = refreshToken.getUser();
-
-        // JWT 토큰 만들기
-        JwtTokenDTO newToken = getJwtTokenDTO(user);
-
-        refreshTokenService.saveRefreshToken(user.getEmail(), newToken.getRefreshToken());
-        return newToken;
-    }
 
     // 현재 로그인한 유저 정보 반환
     public User getCurrentUser() {
@@ -266,6 +313,7 @@ public class UserService {
         return userRepository.findByEmail(currentUserEmail)
                 .orElseThrow(() -> new UsernameNotFoundException("User not found"));
     }
+
 
     public UserDTO getCurrentUserDTO() {
         User user = getCurrentUser();
