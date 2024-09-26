@@ -12,4 +12,15 @@ import lombok.NoArgsConstructor;
 public class CompanyNameDTO {
     private long companyId;
     private String companyName;
+    private String imageUrl;
+
+    public CompanyNameDTO(long companyId, String companyName) {
+        this.companyId = companyId;
+        this.companyName = companyName;
+    }
+
+    public CompanyNameDTO(String companyName, String imageUrl) {
+        this.companyName = companyName;
+        this.imageUrl = imageUrl;
+    }
 }

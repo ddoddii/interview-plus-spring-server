@@ -4,6 +4,8 @@ import com.ddoddii.resume.dto.company.CompanyDeptDTO;
 import com.ddoddii.resume.dto.company.CompanyJobAndDeptDTO;
 import com.ddoddii.resume.dto.company.CompanyJobDTO;
 import com.ddoddii.resume.dto.company.CompanyNameDTO;
+import com.ddoddii.resume.error.errorcode.CompanyErrorCode;
+import com.ddoddii.resume.error.exception.CompanyNotFoundException;
 import com.ddoddii.resume.model.company.CompanyDept;
 import com.ddoddii.resume.model.company.CompanyJob;
 import com.ddoddii.resume.model.company.CompanyName;
@@ -28,12 +30,16 @@ public class CompanyService {
     // 직군
     private final CompanyJobRepository companyJobRepository;
 
-    public List<CompanyNameDTO> getCompanyNames() {
+    private final StorageService storageService;
+
+    public List<CompanyNameDTO> getAllCompanies() {
         List<CompanyName> companyNames = companyNameRepository.findAll();
         return companyNames.stream()
-                .map(companyName -> new CompanyNameDTO(companyName.getId(), companyName.getName()))
+                .map(companyName -> new CompanyNameDTO(companyName.getId(), companyName.getName(),
+                        companyName.getImageUrl()))
                 .collect(Collectors.toList());
     }
+
 
     public List<CompanyDeptDTO> getCompanyDepts() {
         List<CompanyDept> companyDepts = companyDeptRepository.findAll();
@@ -74,5 +80,19 @@ public class CompanyService {
                         entry.getValue().getValue()))
                 .collect(Collectors.toList());
 
+    }
+
+    public CompanyNameDTO getCompanyImage(long companyId) {
+        CompanyName company = companyNameRepository.findFirstById(companyId);
+        if (company == null) {
+            throw new CompanyNotFoundException(CompanyErrorCode.COMPANY_NOT_FOUND);
+        }
+
+        String imageUrl = company.getImageUrl();
+        if (imageUrl == null || imageUrl.trim().isEmpty()) {
+            imageUrl = storageService.getImageUrl(company.getId() + ".png");
+        }
+
+        return new CompanyNameDTO(company.getId(), company.getName(), imageUrl);
     }
 }

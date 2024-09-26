@@ -22,7 +22,7 @@ public class CompanyController {
 
     @GetMapping("/name")
     public ResponseEntity<List<CompanyNameDTO>> getCompanyNames() {
-        List<CompanyNameDTO> companyNameDTOs = companyService.getCompanyNames();
+        List<CompanyNameDTO> companyNameDTOs = companyService.getAllCompanies();
         return ResponseEntity.ok(companyNameDTOs);
     }
 
@@ -42,6 +42,12 @@ public class CompanyController {
     public ResponseEntity<List<CompanyJobAndDeptDTO>> getCompanyDeptAndJobs() {
         List<CompanyJobAndDeptDTO> result = companyService.getCompanyDeptAndJobs();
         return ResponseEntity.ok(result);
+    }
+
+    @GetMapping("/image/{companyId}")
+    public ResponseEntity<CompanyNameDTO> getCompanyImage(@PathVariable long companyId) {
+        CompanyNameDTO companyNameDTO = companyService.getCompanyImage(companyId);
+        return ResponseEntity.ok(companyNameDTO);
     }
 
 
