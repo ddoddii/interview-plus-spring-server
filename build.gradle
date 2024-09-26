@@ -101,3 +101,15 @@ java {
         languageVersion = JavaLanguageVersion.of(17)
     }
 }
+
+test {
+    useJUnitPlatform {
+        excludeTags 'docker-required'
+    }
+}
+
+task dockerTests(type: Test) {
+    useJUnitPlatform {
+        includeTags 'docker-required'
+    }
+}
