@@ -1,14 +1,12 @@
 package com.ddoddii.resume.controller;
 
 import com.ddoddii.resume.dto.user.DuplicateEmailRequestDTO;
-import com.ddoddii.resume.dto.user.JwtTokenDTO;
-import com.ddoddii.resume.dto.user.RefreshTokenRequestDTO;
 import com.ddoddii.resume.dto.user.UserAuthResponseDTO;
+import com.ddoddii.resume.dto.user.UserCheckVerificationCodeDTO;
 import com.ddoddii.resume.dto.user.UserDTO;
+import com.ddoddii.resume.dto.user.UserEmailDTO;
 import com.ddoddii.resume.dto.user.UserEmailLoginRequestDTO;
 import com.ddoddii.resume.dto.user.UserEmailSignUpRequestDTO;
-import com.ddoddii.resume.dto.user.UserEmailVerificationRequestDTO;
-import com.ddoddii.resume.dto.user.UserEmailVerificationResponseDTO;
 import com.ddoddii.resume.dto.user.UserGoogleLoginRequestDTO;
 import com.ddoddii.resume.model.eunm.LoginType;
 import com.ddoddii.resume.service.EmailService;
@@ -23,7 +21,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/api/users/")
+@RequestMapping("/api/users")
 @RequiredArgsConstructor
 public class UserController {
 
@@ -48,17 +46,18 @@ public class UserController {
         return ResponseEntity.ok(response);
     }
 
+    @PostMapping("/google-user-check")
+    public ResponseEntity<String> checkGoogleUser(@RequestBody UserGoogleLoginRequestDTO userGoogleLoginRequestDTO) {
+        userService.googleLogin(userGoogleLoginRequestDTO);
+        return ResponseEntity.ok("user check");
+    }
+
     @PostMapping("/duplicate-email")
     public ResponseEntity<Boolean> checkDuplicateEmail(@RequestBody @Valid DuplicateEmailRequestDTO requestDTO) {
         Boolean response = userService.checkDuplicateEmail(requestDTO);
         return ResponseEntity.ok(response);
     }
 
-    @PostMapping("/refresh-token")
-    public ResponseEntity<JwtTokenDTO> refreshToken(@RequestBody @Valid RefreshTokenRequestDTO refreshTokenRequestDTO) {
-        JwtTokenDTO jwtTokenDTO = userService.generateNewAccessToken(refreshTokenRequestDTO.getToken());
-        return ResponseEntity.ok(jwtTokenDTO);
-    }
 
     @GetMapping("/current-user")
     public ResponseEntity<UserDTO> getCurrentUser() {
@@ -66,14 +65,17 @@ public class UserController {
         return ResponseEntity.ok(currentUser);
     }
 
-    @PostMapping("/verify-email")
-    public ResponseEntity<UserEmailVerificationResponseDTO> getVerificationCode(@RequestBody
-                                                                                UserEmailVerificationRequestDTO userEmailVerificationRequestDTO) {
-        String verificationCode = emailService.validateUserEmail(userEmailVerificationRequestDTO.getEmail());
-        UserEmailVerificationResponseDTO dto = UserEmailVerificationResponseDTO.builder()
-                .verificationCode(verificationCode)
-                .build();
-        return ResponseEntity.ok(dto);
+    @PostMapping("/send-verification-code")
+    public ResponseEntity<String> sendVerificationCode(@RequestBody UserEmailDTO userEmailDTO) {
+        emailService.sendUserEmail(userEmailDTO.getEmail());
+        return ResponseEntity.ok("Verification code sent to " + userEmailDTO.getEmail());
+    }
+
+    @PostMapping("/verify-code")
+    public ResponseEntity<Boolean> validateUserEmail(
+            @RequestBody UserCheckVerificationCodeDTO userCheckVerificationCodeDTO) {
+        boolean verified = emailService.checkUserVerificationCode(userCheckVerificationCodeDTO);
+        return ResponseEntity.ok(verified);
     }
 
     @PostMapping("/guest")
@@ -82,16 +84,16 @@ public class UserController {
         return ResponseEntity.ok(response);
     }
 
-    @PostMapping("guest/email-login")
-    public ResponseEntity<String> guesetEmailSignUp(
+    @PostMapping("/guest/email-login")
+    public ResponseEntity<UserAuthResponseDTO> guesetEmailSignUp(
             @RequestBody @Valid UserEmailSignUpRequestDTO request) {
-        userService.guestEmailSignUpAndLogin(request);
-        return ResponseEntity.ok("Guest Email Signup Success");
+        UserAuthResponseDTO response = userService.upgradeGuestToRegular(request);
+        return ResponseEntity.ok(response);
     }
 
-    @PostMapping("guest/google-login")
-    public ResponseEntity<String> guestGoogleLogin(@RequestBody @Valid UserGoogleLoginRequestDTO request) {
-        userService.guestGoogleSignUpAndLogin(request);
-        return ResponseEntity.ok("Guest Google Signup Success");
-    }
+//    @PostMapping("/guest/google-login")
+//    public ResponseEntity<UserAuthResponseDTO> guestGoogleLogin(@RequestBody @Valid UserGoogleLoginRequestDTO request) {
+//        UserAuthResponseDTO response = userService.guestGoogleSignUpAndLogin(request);
+//        return ResponseEntity.ok(response);
+//    }
 }

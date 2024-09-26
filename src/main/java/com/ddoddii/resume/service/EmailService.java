@@ -1,7 +1,10 @@
 package com.ddoddii.resume.service;
 
+import com.ddoddii.resume.dto.user.UserCheckVerificationCodeDTO;
+import java.util.Map;
 import java.util.Properties;
 import java.util.Random;
+import java.util.concurrent.ConcurrentHashMap;
 import javax.mail.Message;
 import javax.mail.MessagingException;
 import javax.mail.PasswordAuthentication;
@@ -17,12 +20,42 @@ import org.springframework.stereotype.Service;
 @Slf4j
 @RequiredArgsConstructor
 public class EmailService {
-    private String verificationCode;
+    private final Map<String, String> verificationCodeStorage = new ConcurrentHashMap<>();
+    private final Map<String, Long> verificationCodeTimestamp = new ConcurrentHashMap<>();
+    private static final long CODE_EXPIRATION_TIME = 5 * 60 * 1000;
 
-    public String validateUserEmail(String userEmail) {
-        verificationCode = generateVerificationCode();
+
+    public String sendUserEmail(String userEmail) {
+        String verificationCode = generateVerificationCode();
+
+        verificationCodeStorage.put(userEmail, verificationCode);
+        log.info("VERIFY EMAIL : Stored {} for {}.", verificationCodeStorage.get(userEmail), userEmail);
+        verificationCodeTimestamp.put(userEmail, System.currentTimeMillis());
+
         sendEmail(userEmail, verificationCode);
+
         return verificationCode;
+    }
+
+    public boolean checkUserVerificationCode(UserCheckVerificationCodeDTO userCheckVerificationCodeDTO) {
+        String storedCode = verificationCodeStorage.get(userCheckVerificationCodeDTO.getEmail());
+        log.info("VERIFY EMAIL : stored code for user {} is {}.", userCheckVerificationCodeDTO.getEmail(), storedCode);
+        log.info("VERIFY EMAIL : received code for user {} is {}.", userCheckVerificationCodeDTO.getEmail(),
+                userCheckVerificationCodeDTO.getVerificationCode());
+        Long storedTimestamp = verificationCodeTimestamp.get(userCheckVerificationCodeDTO.getEmail());
+
+        if (storedCode == null || storedTimestamp == null) {
+            return false;
+        }
+
+        long currentTime = System.currentTimeMillis();
+        if (currentTime - storedTimestamp > CODE_EXPIRATION_TIME) {
+            verificationCodeStorage.remove(userCheckVerificationCodeDTO.getEmail());
+            verificationCodeTimestamp.remove(userCheckVerificationCodeDTO.getEmail());
+            return false;
+        }
+
+        return storedCode.equals(userCheckVerificationCodeDTO.getVerificationCode());
     }
 
     private String generateVerificationCode() {
@@ -55,15 +88,11 @@ public class EmailService {
             message.setText("Your verification code is: " + verificationCode);
 
             Transport.send(message);
-            log.debug("Email sent successfully.");
+            log.info("Email sent successfully to {}.", toEmail);
 
         } catch (MessagingException e) {
-            throw new RuntimeException(e);
+            throw new RuntimeException(e.getMessage());
         }
-    }
-
-    public boolean verifyCode(String inputCode) {
-        return verificationCode.equals(inputCode);
     }
 
 }
