@@ -3,10 +3,12 @@ package com.ddoddii.resume.error.handler;
 import com.ddoddii.resume.error.ErrorResponse;
 import com.ddoddii.resume.error.errorcode.ErrorCode;
 import com.ddoddii.resume.error.exception.BadCredentialsException;
+import com.ddoddii.resume.error.exception.CompanyNotFoundException;
 import com.ddoddii.resume.error.exception.DuplicateEmailException;
 import com.ddoddii.resume.error.exception.DuplicateIdException;
 import com.ddoddii.resume.error.exception.DuplicateQuestionException;
 import com.ddoddii.resume.error.exception.GoogleAccountRetrieveException;
+import com.ddoddii.resume.error.exception.InterviewCountException;
 import com.ddoddii.resume.error.exception.JsonParseException;
 import com.ddoddii.resume.error.exception.NotExistIdException;
 import com.ddoddii.resume.error.exception.NotExistResumeException;
@@ -74,6 +76,19 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         final ErrorCode errorCode = e.getErrorCode();
         return handleExceptionInternal(errorCode);
     }
+
+    @ExceptionHandler(InterviewCountException.class)
+    public ResponseEntity<Object> handleInterviewCount(final InterviewCountException e) {
+        final ErrorCode errorCode = e.getErrorCode();
+        return handleExceptionInternal(errorCode);
+    }
+
+    @ExceptionHandler(CompanyNotFoundException.class)
+    public ResponseEntity<Object> handleCompanyNotFound(final CompanyNotFoundException e) {
+        final ErrorCode errorCode = e.getErrorCode();
+        return handleExceptionInternal(errorCode);
+    }
+
 
     private ResponseEntity<Object> handleExceptionInternal(final ErrorCode errorCode) {
         return ResponseEntity.status(errorCode.getHttpStatus())

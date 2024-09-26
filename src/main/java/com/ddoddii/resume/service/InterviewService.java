@@ -5,6 +5,8 @@ import com.ddoddii.resume.dto.interview.InterviewResultDTO;
 import com.ddoddii.resume.dto.interview.InterviewStartRequestDTO;
 import com.ddoddii.resume.dto.interview.InterviewStartResponseDTO;
 import com.ddoddii.resume.error.errorcode.ResumeErrorCode;
+import com.ddoddii.resume.error.errorcode.UserErrorCode;
+import com.ddoddii.resume.error.exception.InterviewCountException;
 import com.ddoddii.resume.error.exception.NotExistResumeException;
 import com.ddoddii.resume.model.Evaluation;
 import com.ddoddii.resume.model.Interview;
@@ -33,9 +35,15 @@ public class InterviewService {
     private final EvaluationRepository evaluationRepository;
     private final UserService userService;
 
-    public InterviewStartResponseDTO startInterview(InterviewStartRequestDTO interviewStartRequestDTO) {
+    public InterviewStartResponseDTO startInterview(InterviewStartRequestDTO interviewStartRequestDTO)
+            throws InterviewCountException {
         Interview interview = new Interview();
         User currentUser = userService.getCurrentUser();
+
+        // 인터뷰 횟수 1 감소
+        decreaseInterviewCount(currentUser);
+
+        // 인터뷰 생성
         interview.setInterviewRound(InterviewRound.fromString(interviewStartRequestDTO.getInterviewRound()));
         if (interviewStartRequestDTO.getCompanyId() != null) {
             interview.setCompanyId(interviewStartRequestDTO.getCompanyId());
@@ -57,6 +65,15 @@ public class InterviewService {
         return InterviewStartResponseDTO.builder().
                 interviewId(interviewId)
                 .build();
+    }
+
+    private void decreaseInterviewCount(User currentUser) {
+        Integer remainingInterview = currentUser.getRemainInterview();
+        if (remainingInterview <= 1) {
+            throw new InterviewCountException(UserErrorCode.INTERVIEW_COUNT_ERROR);
+        } else {
+            currentUser.setRemainInterview(remainingInterview - 1);
+        }
     }
 
     public InterviewResultDTO getInterviewResult(long interviewId) {
