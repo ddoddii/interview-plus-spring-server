@@ -15,8 +15,8 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 public class QuestionController {
     private final QuestionService questionService;
-    private final int TECH_QUESTION_AMOUNT = 3;
-    private final int BEHAVIOR_QUESTION_AMOUNT = 3;
+    private final int TECH_QUESTION_AMOUNT = 2;
+    private final int BEHAVIOR_QUESTION_AMOUNT = 2;
 
 
     @GetMapping("/personal/{interviewId}")
@@ -44,5 +44,5 @@ public class QuestionController {
         List<CommonQuestionDTO> questionDTOS = questionService.getIntroduceQuestion(interviewId);
         return questionDTOS;
     }
-    
+
 }
