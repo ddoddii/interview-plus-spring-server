@@ -11,7 +11,8 @@ public enum UserErrorCode implements ErrorCode {
     NOT_EXIST_USER(HttpStatus.NOT_FOUND, "User not found"),
     BAD_CREDENTIALS(HttpStatus.UNAUTHORIZED, "Bad Credentials"),
     GOOGLE_ACCOUNT_PARSE_ERROR(HttpStatus.BAD_REQUEST, "Google Account Parse Error"),
-    GOOGLE_ACCOUNT_RETRIEVE_ERROR(HttpStatus.NOT_FOUND, "Google Account Retrieve Error");
+    GOOGLE_ACCOUNT_RETRIEVE_ERROR(HttpStatus.NOT_FOUND, "Google Account Retrieve Error"),
+    INTERVIEW_COUNT_ERROR(HttpStatus.BAD_REQUEST, "No Remaining Interviews");
 
 
     private final HttpStatus httpStatus;
