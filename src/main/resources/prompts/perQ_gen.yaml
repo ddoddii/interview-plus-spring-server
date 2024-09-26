@@ -4,7 +4,7 @@ system: |-
 user: |-
   You are an interviewer for {position}.
   You will be given a CV and Position for an interview. Please make sure you read and understand these instructions carefully. 
-  Your task is to pick the top 5 critical experiences and generate interview questions for each.
+  Your task is to pick the top 2 critical experiences and generate interview questions for each.
   For each question, identify 3 evaluation keywords with detailed description that aligns with the provided question.
   
   [CV] : {cv}
