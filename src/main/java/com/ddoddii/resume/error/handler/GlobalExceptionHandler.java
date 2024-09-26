@@ -2,7 +2,15 @@ package com.ddoddii.resume.error.handler;
 
 import com.ddoddii.resume.error.ErrorResponse;
 import com.ddoddii.resume.error.errorcode.ErrorCode;
-import com.ddoddii.resume.error.exception.*;
+import com.ddoddii.resume.error.exception.BadCredentialsException;
+import com.ddoddii.resume.error.exception.DuplicateEmailException;
+import com.ddoddii.resume.error.exception.DuplicateIdException;
+import com.ddoddii.resume.error.exception.DuplicateQuestionException;
+import com.ddoddii.resume.error.exception.GoogleAccountRetrieveException;
+import com.ddoddii.resume.error.exception.JsonParseException;
+import com.ddoddii.resume.error.exception.NotExistIdException;
+import com.ddoddii.resume.error.exception.NotExistResumeException;
+import com.ddoddii.resume.error.exception.NotResumeOwnerException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -51,6 +59,18 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
     @ExceptionHandler(DuplicateQuestionException.class)
     public ResponseEntity<Object> handleDuplicatePersonalQuestion(final DuplicateQuestionException e) {
+        final ErrorCode errorCode = e.getErrorCode();
+        return handleExceptionInternal(errorCode);
+    }
+
+    @ExceptionHandler(DuplicateEmailException.class)
+    public ResponseEntity<Object> handleDuplicateEmail(final DuplicateEmailException e) {
+        final ErrorCode errorCode = e.getErrorCode();
+        return handleExceptionInternal(errorCode);
+    }
+
+    @ExceptionHandler(GoogleAccountRetrieveException.class)
+    public ResponseEntity<Object> handleGoogleAccountRetrieval(final GoogleAccountRetrieveException e) {
         final ErrorCode errorCode = e.getErrorCode();
         return handleExceptionInternal(errorCode);
     }

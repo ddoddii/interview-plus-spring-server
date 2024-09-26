@@ -7,9 +7,11 @@ import org.springframework.http.HttpStatus;
 @Getter
 @RequiredArgsConstructor
 public enum UserErrorCode implements ErrorCode {
-    DUPLICATE_USER(HttpStatus.CONFLICT, "User with same id already exists"),
+    DUPLICATE_USER(HttpStatus.CONFLICT, "User with same email already exists"),
     NOT_EXIST_USER(HttpStatus.NOT_FOUND, "User not found"),
-    BAD_CREDENTIALS(HttpStatus.UNAUTHORIZED, "Bad Credentials");
+    BAD_CREDENTIALS(HttpStatus.UNAUTHORIZED, "Bad Credentials"),
+    GOOGLE_ACCOUNT_PARSE_ERROR(HttpStatus.BAD_REQUEST, "Google Account Parse Error"),
+    GOOGLE_ACCOUNT_RETRIEVE_ERROR(HttpStatus.NOT_FOUND, "Google Account Retrieve Error");
 
 
     private final HttpStatus httpStatus;
