@@ -151,9 +151,8 @@ public class UserService {
         } else {
             currentUser = userRepository.findByEmail(userGoogleInfoDTO.getEmail())
                     .orElseThrow(() -> new BadCredentialsException(UserErrorCode.BAD_CREDENTIALS));
-            if (!PasswordEncrypter.isMatch(userGoogleInfoDTO.getAccessToken(), currentUser.getPassword())) {
-                throw new BadCredentialsException(UserErrorCode.BAD_CREDENTIALS);
-            }
+            String encryptPassword = encryptPassword(userGoogleInfoDTO.getAccessToken());
+            currentUser.setPassword(encryptPassword);
         }
 
         JwtTokenDTO loginToken = getJwtTokenDTO(currentUser);
@@ -171,7 +170,6 @@ public class UserService {
                 .user(loggedInUser)
                 .token(loginToken)
                 .build();
-
     }
 
 
@@ -262,31 +260,33 @@ public class UserService {
                 .build();
     }
 
-//    public UserAuthResponseDTO guestGoogleSignUpAndLogin(UserGoogleLoginRequestDTO userGoogleLoginRequestDTO) {
-//        User guestUser = getCurrentUser();
-//        guestUser.setName(userGoogleLoginRequestDTO.getName());
-//        guestUser.setEmail(userGoogleLoginRequestDTO.getEmail());
-//        String encryptedIdToken = PasswordEncrypter.encrypt(userGoogleLoginRequestDTO.getAccessToken());
-//        guestUser.setPassword(encryptedIdToken);
-//        guestUser.setLoginType(LoginType.GOOGLE);
-//        userRepository.save(guestUser);
-//
-//        JwtTokenDTO loginToken = getJwtTokenDTO(guestUser);
-//
-//        UserDTO loggedInUser = UserDTO.builder()
-//                .userId(guestUser.getId())
-//                .name(guestUser.getName())
-//                .email(guestUser.getEmail())
-//                .loginType(guestUser.getLoginType())
-//                .remainInterview(guestUser.getRemainInterview())
-//                .build();
-//
-//        return UserAuthResponseDTO.builder()
-//                .user(loggedInUser)
-//                .token(loginToken)
-//                .build();
-//
-//    }
+    public UserAuthResponseDTO guestGoogleSignUpAndLogin(UserGoogleLoginRequestDTO userGoogleLoginRequestDTO) {
+        User guestUser = getCurrentUser();
+        UserGoogleInfoDTO userGoogleInfoDTO = getGoogleInfo(userGoogleLoginRequestDTO);
+
+        guestUser.setName(userGoogleInfoDTO.getName());
+        guestUser.setEmail(userGoogleInfoDTO.getEmail());
+        String encryptedIdToken = PasswordEncrypter.encrypt(userGoogleInfoDTO.getAccessToken());
+        guestUser.setPassword(encryptedIdToken);
+        guestUser.setLoginType(LoginType.GOOGLE);
+        userRepository.save(guestUser);
+
+        JwtTokenDTO loginToken = getJwtTokenDTO(guestUser);
+
+        UserDTO loggedInUser = UserDTO.builder()
+                .userId(guestUser.getId())
+                .name(guestUser.getName())
+                .email(guestUser.getEmail())
+                .loginType(guestUser.getLoginType())
+                .remainInterview(guestUser.getRemainInterview())
+                .build();
+
+        return UserAuthResponseDTO.builder()
+                .user(loggedInUser)
+                .token(loginToken)
+                .build();
+
+    }
 
 
     // 사용자 삭제

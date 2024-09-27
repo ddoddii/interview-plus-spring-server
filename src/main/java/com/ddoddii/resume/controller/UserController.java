@@ -91,9 +91,9 @@ public class UserController {
         return ResponseEntity.ok(response);
     }
 
-//    @PostMapping("/guest/google-login")
-//    public ResponseEntity<UserAuthResponseDTO> guestGoogleLogin(@RequestBody @Valid UserGoogleLoginRequestDTO request) {
-//        UserAuthResponseDTO response = userService.guestGoogleSignUpAndLogin(request);
-//        return ResponseEntity.ok(response);
-//    }
+    @PostMapping("/guest/google-login")
+    public ResponseEntity<UserAuthResponseDTO> guestGoogleLogin(@RequestBody @Valid UserGoogleLoginRequestDTO request) {
+        UserAuthResponseDTO response = userService.guestGoogleSignUpAndLogin(request);
+        return ResponseEntity.ok(response);
+    }
 }
