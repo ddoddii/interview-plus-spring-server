@@ -225,9 +225,8 @@ class UserControllerTest {
     void emailGoogleLogin_Success() throws Exception{
         // given
         UserGoogleLoginRequestDTO request = UserGoogleLoginRequestDTO.builder()
-                .idToken("idToken")
-                .email(email)
-                .name(name)
+                .tokenType(email)
+                .accessToken(name)
                 .build();
 
         UserDTO userDTO = UserDTO.builder()
@@ -260,9 +259,8 @@ class UserControllerTest {
         when(userService.googleLogin(any())).thenThrow(new DuplicateIdException(UserErrorCode.BAD_CREDENTIALS));
 
         UserGoogleLoginRequestDTO request = UserGoogleLoginRequestDTO.builder()
-                .idToken("idToken")
-                .email(email)
-                .name(name)
+                .tokenType(email)
+                .accessToken(name)
                 .build();
 
         this.mockMvc.perform(post("/api/users/google-login")
@@ -278,8 +276,8 @@ class UserControllerTest {
         // given
         RefreshTokenRequestDTO request = new RefreshTokenRequestDTO("oldRefreshToken");
 
-        JwtTokenDTO jwtTokenDTO =JwtTokenDTO.builder().refreshToken("refreshToken").accessToken("accessToken").grantType("Bearer").build();
-        when(userService.generateNewAccessToken(any())).thenReturn(jwtTokenDTO);
+//        JwtTokenDTO jwtTokenDTO =JwtTokenDTO.builder().refreshToken("refreshToken").accessToken("accessToken").grantType("Bearer").build();
+//        when(userService.generateNewAccessToken(any())).thenReturn(jwtTokenDTO);
 
         this.mockMvc.perform(post("/api/users/refresh-token")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -294,7 +292,7 @@ class UserControllerTest {
     @Test
     void refreshToken_Fail() throws Exception{
         // given
-        when(userService.generateNewAccessToken(any())).thenThrow(new NotExistIdException(UserErrorCode.NOT_EXIST_USER));
+//        when(userService.generateNewAccessToken(any())).thenThrow(new NotExistIdException(UserErrorCode.NOT_EXIST_USER));
 
         RefreshTokenRequestDTO request = new RefreshTokenRequestDTO("oldRefreshToken");
 
