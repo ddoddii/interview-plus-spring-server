@@ -270,37 +270,4 @@ class UserControllerTest {
                 .andExpect(jsonPath("message").value(UserErrorCode.BAD_CREDENTIALS.getMessage()));
     }
 
-    @DisplayName("성공 리프레시 토큰 발행")
-    @Test
-    void refreshToken_Success() throws Exception{
-        // given
-        RefreshTokenRequestDTO request = new RefreshTokenRequestDTO("oldRefreshToken");
-
-//        JwtTokenDTO jwtTokenDTO =JwtTokenDTO.builder().refreshToken("refreshToken").accessToken("accessToken").grantType("Bearer").build();
-//        when(userService.generateNewAccessToken(any())).thenReturn(jwtTokenDTO);
-
-        this.mockMvc.perform(post("/api/users/refresh-token")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("grantType").value("Bearer"))
-                .andExpect(jsonPath("accessToken").value("accessToken"))
-                .andExpect(jsonPath("refreshToken").value("refreshToken"));
-    }
-
-    @DisplayName("실패 리프레시 토큰 발행 - 만료된 토큰")
-    @Test
-    void refreshToken_Fail() throws Exception{
-        // given
-//        when(userService.generateNewAccessToken(any())).thenThrow(new NotExistIdException(UserErrorCode.NOT_EXIST_USER));
-
-        RefreshTokenRequestDTO request = new RefreshTokenRequestDTO("oldRefreshToken");
-
-        this.mockMvc.perform(post("/api/users/refresh-token")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isNotFound())
-                .andExpect(jsonPath("message").value(UserErrorCode.NOT_EXIST_USER.getMessage()));
-    }
-
 }

@@ -23,7 +23,6 @@ class TokenProviderTest {
         tokenProvider.afterPropertiesSet();
     }
 
-
     @DisplayName("성공: 토큰 생성")
     @Test
     void createTokenSuccess() {
